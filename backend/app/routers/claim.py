@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import random
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 from fastapi import APIRouter, HTTPException
@@ -194,36 +195,43 @@ def _confirm_one_row(row: dict[str, Any]) -> dict[str, Any]:
     return result
 
 
+def _confirm_one_row_safe(row: dict[str, Any]) -> dict[str, Any]:
+    """线程池包装：异常不外抛，保证单条失败不影响整体。"""
+    try:
+        return _confirm_one_row(row)
+    except Exception as exc:
+        return {"ok": False, "id": row["id"], "email": row["email"], "error": str(exc)}
+
+
 @router.post("/confirm-all")
-def confirm_all() -> dict[str, Any]:
-    """一键确认：遍历全部已提交历史（含已确认）。
+def confirm_all(workers: int = 6) -> dict[str, Any]:
+    """一键确认（并发版）：遍历全部已提交历史（含已确认）。
 
     - 未确认过：找验证邮件并点击；
     - 已点击同一封验证邮件 → 跳过；
     - 已确认但收件箱出现新的验证邮件（二次验证）→ 重新点击新的链接。
+    workers 控制并发线程数（1-10），默认 6。
     """
+    workers = max(1, min(10, workers))
     rows = db.list_submitted()
-    results = []
-    done = 0
-    no_mail = 0
-    failed = 0
-    skipped = 0
-    for row in rows:
-        try:
-            r = _confirm_one_row(row)
-        except Exception as exc:
-            r = {"ok": False, "id": row["id"], "email": row["email"], "error": str(exc)}
-        results.append(r)
-        if r.get("reason") == "already_confirmed_same_mail":
-            skipped += 1
-            done += 1
-        elif r.get("ok"):
-            done += 1
-        elif r.get("reason") == "no_verify_mail":
-            no_mail += 1
-        else:
-            failed += 1
-        time.sleep(random.uniform(0.8, 2.0))
+    started = time.time()
+    results: list[dict[str, Any]] = []
+    done = no_mail = failed = skipped = 0
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(_confirm_one_row_safe, row) for row in rows]
+        for fut in as_completed(futures):
+            r = fut.result()
+            results.append(r)
+            if r.get("reason") == "already_confirmed_same_mail":
+                skipped += 1
+                done += 1
+            elif r.get("ok"):
+                done += 1
+            elif r.get("reason") == "no_verify_mail":
+                no_mail += 1
+            else:
+                failed += 1
+    results.sort(key=lambda x: x.get("id") or 0)
     return {
         "ok": True,
         "total": len(rows),
@@ -231,6 +239,8 @@ def confirm_all() -> dict[str, Any]:
         "skipped_same_mail": skipped,
         "no_verify_mail": no_mail,
         "failed": failed,
+        "workers": workers,
+        "elapsed_sec": round(time.time() - started, 1),
         "results": results,
     }
 

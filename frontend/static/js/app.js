@@ -45,11 +45,11 @@ qs('#batch').onclick = async () => {
 qs('#load-history').onclick = loadHistory;
 
 qs('#confirm-all').onclick = async () => {
-  out('#confirm-out', '正在遍历历史记录查收确认邮件并点击确认链接…（每条间隔约1-2秒）');
+  out('#confirm-out', '并发确认中（workers=6）…');
   const r = await api('/api/claim/confirm-all', {method:'POST'});
   const d = r.data || {};
   out('#confirm-out',
-    `总数 ${d.total??0} ｜ 已确认 ${d.confirmed??0} ｜ 暂无确认邮件 ${d.no_verify_mail??0} ｜ 失败 ${d.failed??0}\n\n` + j(d.results || d));
+    `总数 ${d.total??0} ｜ 已确认 ${d.confirmed??0} ｜ 跳过同邮件 ${d.skipped_same_mail??0} ｜ 暂无确认邮件 ${d.no_verify_mail??0} ｜ 失败 ${d.failed??0} ｜ 耗时 ${d.elapsed_sec??'-'}s\n\n` + j(d.results || d));
   loadHistory();
 };
 
