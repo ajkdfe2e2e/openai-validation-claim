@@ -16,8 +16,7 @@ DATA_DIR.mkdir(parents=True, exist_ok=True)
 def _org_domains() -> tuple[str, ...]:
     raw = os.getenv(
         "CFMAIL_ORG_DOMAINS",
-        "foejapanjp.org,jaapfjp.org,living-in-peacejp.org,"
-        "edu.foejapanjp.org,edu.jaapfjp.org",
+        "foejapanjp.org,jaapfjp.org,living-in-peacejp.org,edu.foejapanjp.org,edu.jaapfjp.org,lk1950.dpdns.org,edu.lk1950.dpdns.org,k12.lk1950.dpdns.org,lk1.dpdns.org,edu.lk1.dpdns.org,k12.lk1.dpdns.org,ybw111.dpdns.org,edu.ybw111.dpdns.org,k12.ybw111.dpdns.org,k12.dpdns.org,edu.k12.dpdns.org",
     )
     return tuple(d.strip() for d in raw.split(",") if d.strip())
 
