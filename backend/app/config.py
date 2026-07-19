@@ -30,10 +30,9 @@ class Settings:
     entry_url: str = os.getenv(
         "GOODSTACK_ENTRY_URL", "https://validate.poweredbypercent.com/openai"
     )
-    partner_public_key: str = os.getenv(
-        "GOODSTACK_PARTNER_KEY",
-        "pk_3f371f2f-b470-43d5-9605-dc1a58b8ccb3",
-    )
+    # 注意：partnerPublicKey 是 Goodstack 的公开 key（OpenAI 入口 token JWT 的明文 claim），
+    # 不是 secret，但默认留空，需在 .env 配置 GOODSTACK_PARTNER_KEY。
+    partner_public_key: str = os.getenv("GOODSTACK_PARTNER_KEY", "")
     default_country: str = "JPN"
     default_query_pool: tuple[str, ...] = (
         "NPO", "Foundation", "Charity", "Association", "Society", "Welfare",
