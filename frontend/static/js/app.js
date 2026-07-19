@@ -44,6 +44,15 @@ qs('#batch').onclick = async () => {
 };
 qs('#load-history').onclick = loadHistory;
 
+qs('#confirm-all').onclick = async () => {
+  out('#confirm-out', '正在遍历历史记录查收确认邮件并点击确认链接…（每条间隔约1-2秒）');
+  const r = await api('/api/claim/confirm-all', {method:'POST'});
+  const d = r.data || {};
+  out('#confirm-out',
+    `总数 ${d.total??0} ｜ 已确认 ${d.confirmed??0} ｜ 暂无确认邮件 ${d.no_verify_mail??0} ｜ 失败 ${d.failed??0}\n\n` + j(d.results || d));
+  loadHistory();
+};
+
 async function loadHistory(){
   const r = await api('/api/claim/history?limit=50');
   const tb = qs('#history tbody');
@@ -56,8 +65,12 @@ async function loadHistory(){
       <td>${escapeHtml(x.organisation_name||'')}<br><small>${x.corporate_number||''}</small></td>
       <td class="${x.status==='submitted'?'ok':'err'}">${x.status}</td>
       <td>${escapeHtml(x.email||'')}</td>
-      <td><button class="ghost" data-id="${x.id}" data-act="mails">收信</button></td>
-      <td><button class="ghost" data-id="${x.id}" data-act="code">验证码</button></td>
+      <td>${x.confirmed_at ? '<span class="ok">✓ 已确认</span><br><small>'+(x.confirmed_at||'').slice(0,19)+'</small>' : '<span class="muted">未确认</span>'}</td>
+      <td>
+        <button class="ghost" data-id="${x.id}" data-act="mails">收信</button>
+        <button class="ghost" data-id="${x.id}" data-act="code">验证码</button>
+        ${x.confirmed_at ? '' : `<button class="ghost" data-id="${x.id}" data-act="confirm">确认</button>`}
+      </td>
     </tr>`).join('') || '<tr><td colspan="7" class="muted">暂无</td></tr>';
   tb.querySelectorAll('button').forEach(b => b.onclick = onRowAction);
 }
@@ -65,6 +78,13 @@ async function loadHistory(){
 async function onRowAction(e){
   const id = e.currentTarget.dataset.id;
   const act = e.currentTarget.dataset.act;
+  if (act === 'confirm') {
+    out('#confirm-out', `确认 #${id} 中…`);
+    const r = await api(`/api/claim/${id}/confirm`, {method:'POST'});
+    out('#confirm-out', j(r.data));
+    loadHistory();
+    return;
+  }
   const r = await api(`/api/claim/${id}/${act}`);
   out('#mail-out', j(r.data));
 }

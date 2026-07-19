@@ -50,6 +50,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS ux_submissions_email ON submissions(email);
 CREATE INDEX IF NOT EXISTS ix_submissions_created ON submissions(created_at);
 """
 
+MIGRATIONS = (
+    "ALTER TABLE submissions ADD COLUMN confirmed_at TEXT",
+    "ALTER TABLE submissions ADD COLUMN confirm_note TEXT",
+)
+
 
 def _connect() -> sqlite3.Connection:
     conn = sqlite3.connect(settings.db_path, isolation_level=None)
@@ -70,6 +75,11 @@ def get_conn():
 def init_db() -> None:
     with get_conn() as conn:
         conn.executescript(SCHEMA)
+        for sql in MIGRATIONS:
+            try:
+                conn.execute(sql)
+            except sqlite3.OperationalError:
+                pass  # 列已存在
 
 
 # ---- NPO 库 ----
@@ -174,4 +184,25 @@ def update_status(row_id: int, status: str, note: str | None = None) -> None:
     with get_conn() as conn:
         conn.execute(
             "UPDATE submissions SET status=?, note=? WHERE id=?", (status, note, row_id)
+        )
+
+
+# ---- 邮箱确认 ----
+def list_unconfirmed(limit: int = 500) -> list[dict[str, Any]]:
+    """已提交但尚未点确认链接的历史记录。"""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """SELECT * FROM submissions
+               WHERE status='submitted' AND confirmed_at IS NULL
+               ORDER BY id DESC LIMIT ?""",
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def mark_confirmed(row_id: int, note: str | None = None) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE submissions SET confirmed_at=?, confirm_note=? WHERE id=?",
+            (datetime.now(timezone.utc).isoformat(), note, row_id),
         )

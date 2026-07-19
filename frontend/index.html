@@ -10,7 +10,7 @@
 <main class="wrap">
   <header class="card">
     <h1>OpenAI 非营利验证 自动申请</h1>
-    <p class="muted">国家 = 日本 ｜ 申请人 = 川博 ｜ 邮箱 = cfmail 随机 org 域名 + 随机人名 ｜ 组织 = 日本 NPO（含法人编号）库随机抽取去重</p>
+    <p class="muted">国家 = 日本 ｜ 申请人 = 川博 ｜ 邮箱 = cfmail 随机 .org 域名 + 随机人名 ｜ 组织 = 日本 NPO（含法人编号）库随机抽取去重</p>
     <div class="row stats" id="stats"></div>
   </header>
 
@@ -37,10 +37,12 @@
     <h2>申请历史</h2>
     <div class="row">
       <button id="load-history" class="ghost">刷新</button>
+      <button id="confirm-all" class="primary">一键确认全部验证邮件</button>
     </div>
+    <pre id="confirm-out" class="out muted"></pre>
     <table id="history">
       <thead><tr>
-        <th>#</th><th>提交时间</th><th>组织(法人番号)</th><th>状态</th><th>邮箱</th><th>收信</th><th>验证码</th>
+        <th>#</th><th>提交时间</th><th>组织(法人番号)</th><th>状态</th><th>邮箱</th><th>邮箱确认</th><th>操作</th>
       </tr></thead>
       <tbody></tbody>
     </table>

@@ -9,7 +9,7 @@ from typing import Any
 
 from fastapi import APIRouter, HTTPException
 
-from .. import cfmail, db, goodstack, namegen, npodb
+from .. import cfmail, confirm, db, goodstack, namegen, npodb
 from ..config import settings
 
 
@@ -172,3 +172,53 @@ def stats() -> dict[str, Any]:
         "npos_unused_recognized": db.count_unused_npos(recognized_only=True),
         "submissions": len(db.list_submissions(limit=10000)),
     }
+
+
+def _confirm_one_row(row: dict[str, Any]) -> dict[str, Any]:
+    """对单条历史记录：找确认邮件 → 点链接 → 记录。"""
+    result = confirm.confirm_email(row["email"])
+    result["id"] = row["id"]
+    if result.get("ok"):
+        db.mark_confirmed(row["id"], note=(result.get("click") or {}).get("final_url"))
+    return result
+
+
+@router.post("/confirm-all")
+def confirm_all() -> dict[str, Any]:
+    """一键确认：遍历申请历史里所有已提交未确认的记录，
+    找 Goodstack 确认邮件并自动点击确认链接。"""
+    rows = db.list_unconfirmed()
+    results = []
+    done = 0
+    no_mail = 0
+    failed = 0
+    for row in rows:
+        try:
+            r = _confirm_one_row(row)
+        except Exception as exc:
+            r = {"ok": False, "id": row["id"], "email": row["email"], "error": str(exc)}
+        results.append(r)
+        if r.get("ok"):
+            done += 1
+        elif r.get("reason") == "no_verify_mail":
+            no_mail += 1
+        else:
+            failed += 1
+        time.sleep(random.uniform(0.8, 2.0))
+    return {
+        "ok": True,
+        "total": len(rows),
+        "confirmed": done,
+        "no_verify_mail": no_mail,
+        "failed": failed,
+        "results": results,
+    }
+
+
+@router.post("/{row_id}/confirm")
+def confirm_one(row_id: int) -> dict[str, Any]:
+    """确认单条历史记录的邮箱。"""
+    row = db.get_submission(row_id)
+    if not row:
+        raise HTTPException(status_code=404, detail="not found")
+    return _confirm_one_row(row)

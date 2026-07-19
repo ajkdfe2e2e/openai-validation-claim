@@ -10,11 +10,22 @@ services:
       - VALCLAIM_DATA_DIR=/data
     volumes:
       - ./data:/data
-    ports:
-      - "127.0.0.1:8765:8765"
     networks:
-      - sub2api-network
+      - vc-network
+    # 不暴露任何主机端口，仅经 Cloudflare Tunnel 访问
+
+  vc-cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: vc-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CF_TUNNEL_TOKEN}
+    depends_on:
+      - vc-backend
+    networks:
+      - vc-network
+
 networks:
-  sub2api-network:
-    external: true
-    name: sub2api-deploy_sub2api-network
+  vc-network:
+    name: vc-network

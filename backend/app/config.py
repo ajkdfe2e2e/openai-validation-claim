@@ -12,13 +12,12 @@ DATA_DIR = Path(os.getenv("VALCLAIM_DATA_DIR", PROJECT_ROOT / "data"))
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 
-# 仅放入经 Goodstack advanced-email-validation 验证为 isValid=True 的 cfmail org 域名
+# 仅使用经 Goodstack advanced-email-validation 验证为 isValid=True 的 .org 域名
 def _org_domains() -> tuple[str, ...]:
     raw = os.getenv(
         "CFMAIL_ORG_DOMAINS",
         "foejapanjp.org,jaapfjp.org,living-in-peacejp.org,"
-        "edu.foejapanjp.org,edu.jaapfjp.org,edu.lk1950.online,"
-        "lk1950.online,lk1940.cc.cd",
+        "edu.foejapanjp.org,edu.jaapfjp.org",
     )
     return tuple(d.strip() for d in raw.split(",") if d.strip())
 
