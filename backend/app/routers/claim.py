@@ -175,30 +175,49 @@ def stats() -> dict[str, Any]:
 
 
 def _confirm_one_row(row: dict[str, Any]) -> dict[str, Any]:
-    """对单条历史记录：找确认邮件 → 点链接 → 记录。"""
+    """对单条历史记录：找最新确认邮件 → 若与已点的 mail_id 不同则点链接。
+    二次验证场景下，Goodstack 会发新的验证邮件，这里靠 confirm_mail_id 比对识别。"""
     result = confirm.confirm_email(row["email"])
     result["id"] = row["id"]
+    result["prev_mail_id"] = row.get("confirm_mail_id")
+    # 已点过同一封验证邮件 → 视为已确认，跳过点击}
+    if result.get("mail_id") and result["mail_id"] == row.get("confirm_mail_id"):
+        result["ok"] = True
+        result["reason"] = "already_confirmed_same_mail"
+        result["click"] = result.get("click") or {"ok": True, "status_code": None, "final_url": ""}
+        return result
     if result.get("ok"):
-        db.mark_confirmed(row["id"], note=(result.get("click") or {}).get("final_url"))
+        db.mark_confirmed_with_mail(
+            row["id"], result.get("mail_id"),
+            note=(result.get("click") or {}).get("final_url")
+        )
     return result
 
 
 @router.post("/confirm-all")
 def confirm_all() -> dict[str, Any]:
-    """一键确认：遍历申请历史里所有已提交未确认的记录，
-    找 Goodstack 确认邮件并自动点击确认链接。"""
-    rows = db.list_unconfirmed()
+    """一键确认：遍历全部已提交历史（含已确认）。
+
+    - 未确认过：找验证邮件并点击；
+    - 已点击同一封验证邮件 → 跳过；
+    - 已确认但收件箱出现新的验证邮件（二次验证）→ 重新点击新的链接。
+    """
+    rows = db.list_submitted()
     results = []
     done = 0
     no_mail = 0
     failed = 0
+    skipped = 0
     for row in rows:
         try:
             r = _confirm_one_row(row)
         except Exception as exc:
             r = {"ok": False, "id": row["id"], "email": row["email"], "error": str(exc)}
         results.append(r)
-        if r.get("ok"):
+        if r.get("reason") == "already_confirmed_same_mail":
+            skipped += 1
+            done += 1
+        elif r.get("ok"):
             done += 1
         elif r.get("reason") == "no_verify_mail":
             no_mail += 1
@@ -209,6 +228,7 @@ def confirm_all() -> dict[str, Any]:
         "ok": True,
         "total": len(rows),
         "confirmed": done,
+        "skipped_same_mail": skipped,
         "no_verify_mail": no_mail,
         "failed": failed,
         "results": results,

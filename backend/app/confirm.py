@@ -81,14 +81,16 @@ def click_verify_link(link: str) -> dict[str, Any]:
 
 
 def confirm_email(address: str) -> dict[str, Any]:
-    """对单个邮箱：找确认邮件 → 点链接。"""
+    """对单个邮箱：找最新确认邮件 → 点链接。返回结果含邮件 ID。"""
     found = find_verify_mail(address)
     if not found:
-        return {"ok": False, "email": address, "reason": "no_verify_mail"}
+        return {"ok": False, "email": address, "reason": "no_verify_mail", "mail_id": None}
+    mail_id = (found["mail"] or {}).get("id") or (found["mail"] or {}).get("message_id") or None
     result = click_verify_link(found["link"])
     return {
         "ok": bool(result.get("ok")),
         "email": address,
+        "mail_id": mail_id,
         "link": found["link"][:200],
         "mail_subject": (found["mail"] or {}).get("subject"),
         "click": result,

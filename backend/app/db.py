@@ -53,6 +53,7 @@ CREATE INDEX IF NOT EXISTS ix_submissions_created ON submissions(created_at);
 MIGRATIONS = (
     "ALTER TABLE submissions ADD COLUMN confirmed_at TEXT",
     "ALTER TABLE submissions ADD COLUMN confirm_note TEXT",
+    "ALTER TABLE submissions ADD COLUMN confirm_mail_id TEXT",
 )
 
 
@@ -205,4 +206,22 @@ def mark_confirmed(row_id: int, note: str | None = None) -> None:
         conn.execute(
             "UPDATE submissions SET confirmed_at=?, confirm_note=? WHERE id=?",
             (datetime.now(timezone.utc).isoformat(), note, row_id),
+        )
+
+
+def list_submitted(limit: int = 500) -> list[dict[str, Any]]:
+    """已提交的全部历史，含已确认的（用于二次验证再检查）。"""
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT * FROM submissions WHERE status='submitted' ORDER BY id DESC LIMIT ?",
+            (limit,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def mark_confirmed_with_mail(row_id: int, mail_id: str | None, note: str | None = None) -> None:
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE submissions SET confirmed_at=?, confirm_note=?, confirm_mail_id=? WHERE id=?",
+            (datetime.now(timezone.utc).isoformat(), note, mail_id, row_id),
         )
